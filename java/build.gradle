@@ -2,6 +2,11 @@ plugins {
     id 'java'
 }
 
+java {
+    sourceCompatibility = "21"
+    targetCompatibility = "21"
+}
+
 group 'com.github.salpadding'
 version '0.0.1'
 
@@ -11,10 +16,11 @@ repositories {
 
 jar{
     from sourceSets.main.allSource
+    duplicatesStrategy= DuplicatesStrategy.EXCLUDE
 }
 
 ext {
-    lombokVersion = '1.18.10'
+    lombokVersion = '1.18.30'
 }
 
 dependencies {

@@ -11,7 +11,7 @@ pub struct Rp<T> {
     ptr: usize,
 }
 
-impl<T: Debug> Debug for Rp<T> {
+impl<T: Debug + 'static> Debug for Rp<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if self.is_null() {
             f.write_str("NULL")
@@ -40,7 +40,7 @@ impl<T> Default for Rp<T> {
     }
 }
 
-impl<T> Deref for Rp<T> {
+impl<T: 'static> Deref for Rp<T> {
     type Target = T;
 
     #[inline]
@@ -49,14 +49,14 @@ impl<T> Deref for Rp<T> {
     }
 }
 
-impl<T> DerefMut for Rp<T> {
+impl<T: 'static> DerefMut for Rp<T> {
     #[inline]
     fn deref_mut(&mut self) -> &'static mut T {
         self.get_mut()
     }
 }
 
-impl<T> AsRef<T> for Rp<T> {
+impl<T: 'static> AsRef<T> for Rp<T> {
     #[inline]
     fn as_ref(&self) -> &'static T {
         self.get_mut()

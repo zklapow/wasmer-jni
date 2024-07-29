@@ -23,5 +23,6 @@ fi
 
 pushd java>>/dev/null
 ./gradlew test
+./gradlew assemble
 
 popd>>/dev/null
