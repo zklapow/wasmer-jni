@@ -1,19 +1,17 @@
-use std::{mem, ptr::null_mut};
-
 use jni::{JNIEnv, sys::{jlongArray, jobjectArray}};
-use lazy_static::__Deref;
-use wasmer::{RuntimeError, Type, Val, Value};
 
-use crate::{jobject, StringErr};
+use crate::StringErr;
+
+use wasmer::{RuntimeError, Type, Value, ValueType};
 
 pub trait ToVmType {
-    fn convert(&self, src: Vec<i64>) -> Result<Vec<Val>, RuntimeError>;
+    fn convert(&self, src: Vec<i64>) -> Result<Vec<Value>, RuntimeError>;
 }
 
 
 impl<T: core::ops::Deref<Target=[Type]>> ToVmType for T {
-    fn convert(&self, src: Vec<i64>) -> Result<Vec<Val>, RuntimeError> {
-        let mut r: Vec<Val> = Vec::new();
+    fn convert(&self, src: Vec<i64>) -> Result<Vec<Value>, RuntimeError> {
+        let mut r: Vec<Value> = Vec::new();
         for i in 0..src.len() {
             let v =
                 match self[i] {

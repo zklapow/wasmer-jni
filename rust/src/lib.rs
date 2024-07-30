@@ -1,6 +1,36 @@
 #![feature(unchecked_math)] // allow unchecked math
 #![allow(warnings)]
 
+#[macro_use]
+extern crate lazy_static;
+#[cfg(test)]
+#[macro_use]
+extern crate serde;
+#[macro_use]
+extern crate wasmer;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter, Write};
+use std::ops::Deref;
+use std::ptr::null_mut;
+use std::str::Utf8Error;
+
+// This is the interface to the JVM that we'll
+// call the majority of our methods on.
+use jni::JNIEnv;
+// These objects are what you should use as arguments to your native function.
+// They carry extra lifetime information to prevent them escaping this context
+// and getting used after being GC'd.
+use jni::objects::{JClass, TypeArray};
+// This is just a pointer. We'll be returning it from our function.
+// We can't return one of the objects with lifetime information because the
+// lifetime checker won't let us.
+use jni::sys::{jbyteArray, jint, jlong, jlongArray, jobjectArray, jstring};
+use wasmer::{CompileError, Engine, ExportError, Exports, Features, Imports, Instance, InstantiationError, Module, RuntimeError, Store, Type};
+
+use utils::{JNIUtil};
+
+use crate::rp::Rp;
+
 macro_rules! jni_ret {
     ($ex: expr, $env: ident, $default: expr) => {
         match $ex {
@@ -74,45 +104,6 @@ macro_rules! decode_sig {
         };
     };
 }
-
-#[macro_use]
-extern crate lazy_static;
-#[cfg(test)]
-#[macro_use]
-extern crate serde;
-#[macro_use]
-extern crate wasmer;
-
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter, Write};
-use std::ops::Deref;
-use std::ptr::null_mut;
-use std::str::Utf8Error;
-use std::sync::PoisonError;
-
-// This is the interface to the JVM that we'll
-// call the majority of our methods on.
-use jni::JNIEnv;
-// These objects are what you should use as arguments to your native function.
-// They carry extra lifetime information to prevent them escaping this context
-// and getting used after being GC'd.
-use jni::objects::{GlobalRef, JClass, JObject, JString, JValue, TypeArray};
-// This is just a pointer. We'll be returning it from our function.
-// We can't return one of the objects with lifetime information because the
-// lifetime checker won't let us.
-use jni::sys::{_jobject, jbyteArray, jint, jlong, jlongArray, jobject, jobjectArray, jstring};
-use wasmer::{
-    CompileError, ExportError, Exports, Features, Function, FunctionType, ImportObject, imports,
-    Instance, InstantiationError, Module, RuntimeError, Store, Type, Value,
-};
-use wasmer::wasmparser::Operator;
-use wasmer_compiler_singlepass::Singlepass;
-use wasmer_engine_universal::Universal;
-use wasmer_compiler_cranelift::Cranelift;
-
-use utils::{JNIUtil, ToVmType};
-
-use crate::rp::Rp;
 
 mod hex;
 mod utils;
@@ -222,9 +213,10 @@ mod features_enum {
     pub const memory64: u64 = 1 << 8;
 }
 
+type InstanceStore = (Instance, Store);
 
 #[inline]
-fn get_ins_by_id(id: usize) -> Rp<Instance> {
+fn get_ins_by_id(id: usize) -> Rp<InstanceStore> {
     id.into()
 }
 
@@ -258,28 +250,30 @@ fn create_instance(
                 memory64
             );
 
+        features.bulk_memory = true;
+
 
         // Create the store
-        let store = Store::new(&Universal::new(Singlepass::default()).features(features).engine());
+        let mut store = Store::new(Engine::default());
         let bytes = env.convert_byte_array(_module)?;
         let module = Module::new(&store, bytes)?;
 
-        let mut import_object = ImportObject::new();
+        let mut import_object = Imports::new();
         let mut namespace = Exports::new();
 
         for i in 0..host_names.len() {
             let name = host_names[i].clone();
             let jvm = env.get_java_vm()?;
             let s = sigs[i].clone();
-            let host_function = crate::instance::create_host(&store, s, jvm, ins, i as jint);
+            let host_function = crate::instance::create_host(&mut store, s, jvm, ins, i as jint);
             namespace.insert(name, host_function);
         }
 
-        import_object.register("env", namespace);
+        import_object.register_namespace("env", namespace);
 
-        let instance = Instance::new(&module, &import_object)?;
+        let instance = Instance::new(&mut store, &module, &import_object)?;
 
-        let i = Rp::new(instance).ptr();
+        let i = Rp::new((instance, store)).ptr();
         return Ok(i as jlong);
     }
 }

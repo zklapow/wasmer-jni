@@ -73,7 +73,7 @@ public class Example {
     public static void main(String[] args) {
         Natives.initialize(1024);
         byte[] bin = TestUtil.readClassPathFile("testdata/wasm.wasm");
-        Instance ins = Instance.create(bin, Options.empty(), Arrays.asList(new EmptyHost("alert"), new MemoryPeek()));
+        Instance ins = Instance.create(bin, Options.empty().moduleLinking(true), Arrays.asList(new EmptyHost("alert"), new MemoryPeek()));
 
         try {
             // for Integer, use Integer.toUnsignedLong
